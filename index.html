@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Сцена с персонажем</title>
+  <style>
+    :root {
+      --ui-bg: rgba(8, 8, 12, 0.62);
+      --ui-border: rgba(255, 255, 255, 0.18);
+      --text: #ffffff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-top: env(safe-area-inset-top, 0px);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #000;
+      color: var(--text);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .bg-layer {
+      position: absolute;
+      inset: 0;
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      opacity: 0;
+      transition: opacity 1.2s ease-in-out, transform 6s linear;
+      transform: scale(1.04);
+      will-change: opacity, transform;
+    }
+
+    .bg-layer.visible {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+
+    .sky-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.06), rgba(0,0,0,0.1), rgba(0,0,0,0.34));
+      pointer-events: none;
+    }
+
+    .ground {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 24vh;
+      min-height: 110px;
+      background: linear-gradient(to top, rgba(24, 24, 20, 0.96), rgba(54, 54, 42, 0.76));
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 20px 35px rgba(0,0,0,0.2);
+    }
+
+    .ground::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 10% 30%, rgba(255,255,255,0.04) 0 2px, transparent 3px),
+        radial-gradient(circle at 30% 70%, rgba(255,255,255,0.03) 0 2px, transparent 3px),
+        radial-gradient(circle at 55% 35%, rgba(255,255,255,0.03) 0 2px, transparent 3px),
+        radial-gradient(circle at 80% 60%, rgba(255,255,255,0.03) 0 2px, transparent 3px);
+      opacity: 0.5;
+    }
+
+    #walker {
+      position: absolute;
+      left: 0;
+      bottom: 15vh;
+      width: min(34vw, 160px);
+      aspect-ratio: 0.62 / 1;
+      transform: translateX(110vw);
+      will-change: transform;
+      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.35));
+    }
+
+    .character {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .head {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      width: 34%;
+      aspect-ratio: 1 / 1;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      overflow: hidden;
+      border: 0.28rem solid rgba(255,255,255,0.92);
+      background: #d9d9d9;
+      z-index: 3;
+    }
+
+    .head img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .torso {
+      position: absolute;
+      left: 50%;
+      top: 19%;
+      width: 24%;
+      height: 29%;
+      transform: translateX(-50%);
+      border-radius: 1.1rem;
+      background: linear-gradient(to bottom, #1f3c75, #0f203f);
+      z-index: 2;
+    }
+
+    .arm, .leg {
+      position: absolute;
+      left: 50%;
+      transform-origin: top center;
+      border-radius: 999px;
+      z-index: 1;
+    }
+
+    .arm {
+      top: 23%;
+      width: 8%;
+      height: 24%;
+      margin-left: -4%;
+      background: linear-gradient(to bottom, #203560, #172648);
+    }
+
+    .arm.left { margin-left: -16%; }
+    .arm.right { margin-left: 8%; }
+
+    .leg {
+      top: 44%;
+      width: 9%;
+      height: 31%;
+      margin-left: -4.5%;
+      background: linear-gradient(to bottom, #2c2c2c, #101010);
+    }
+
+    .leg.left { margin-left: -11%; }
+    .leg.right { margin-left: 2%; }
+
+    .shadow {
+      position: absolute;
+      left: 50%;
+      bottom: 4%;
+      width: 56%;
+      height: 7%;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: rgba(0,0,0,0.22);
+      filter: blur(4px);
+    }
+
+    .hud {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: calc(12px + var(--safe-top));
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .badge {
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-border);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 13px;
+      line-height: 1;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      pointer-events: auto;
+    }
+
+    .controls {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: calc(12px + var(--safe-bottom));
+      display: flex;
+      justify-content: center;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    .controls-inner {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-border);
+      border-radius: 999px;
+      padding: 10px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      pointer-events: auto;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(255,255,255,0.12);
+      min-height: 44px;
+      cursor: pointer;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    #startOverlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      z-index: 40;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.56), rgba(0,0,0,0.7));
+      padding: 18px;
+    }
+
+    .start-card {
+      width: min(92vw, 430px);
+      border-radius: 22px;
+      padding: 20px;
+      background: rgba(15,15,18,0.8);
+      border: 1px solid rgba(255,255,255,0.15);
+      text-align: center;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .start-card h1 {
+      margin: 0 0 10px;
+      font-size: clamp(24px, 6vw, 34px);
+    }
+
+    .start-card p {
+      margin: 0 0 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      opacity: 0.92;
+    }
+
+    .hint {
+      font-size: 12px;
+      opacity: 0.74;
+      margin-top: 10px;
+    }
+
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-1.8%); }
+    }
+
+    @media (min-width: 768px) {
+      #walker {
+        width: min(20vw, 190px);
+        bottom: 13vh;
+      }
+
+      .badge {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="bgA" class="bg-layer"></div>
+    <div id="bgB" class="bg-layer"></div>
+    <div class="sky-overlay"></div>
+
+    <div id="walker" aria-hidden="true">
+      <div class="character" id="character">
+        <div class="head"><img id="faceImg" alt="Лицо персонажа" src="assets/face.jpg" /></div>
+        <div class="torso"></div>
+        <div class="arm left" id="armLeft"></div>
+        <div class="arm right" id="armRight"></div>
+        <div class="leg left" id="legLeft"></div>
+        <div class="leg right" id="legRight"></div>
+        <div class="shadow"></div>
+      </div>
+    </div>
+
+    <div class="ground"></div>
+
+
+      <div class="badge" id="musicState">Музыка: ожидание</div>
+    </div>
+
+    <div class="controls">
+      <div class="controls-inner">
+        <button id="toggleMusicBtn" type="button">Пауза / Пуск</button>
+        <button id="restartBtn" type="button">Перезапуск</button>
+      </div>
+    </div>
+
+    <div id="startOverlay">
+      <div class="start-card">
+        <h1>Запустить сцену</h1>
+        <p>
+          На смартфонах музыка обычно не запускается автоматически. Нажмите кнопку ниже,
+          чтобы начать анимацию и воспроизведение mp3.
+        </p>
+        <button id="startBtn" type="button">Старт</button>
+
+      </div>
+    </div>
+
+    <audio id="bgMusic" src="assets/music.mp3" preload="auto" loop></audio>
+  </div>
+
+  <script>
+    const config = {
+      // Можно менять имена файлов здесь.
+      faceImage: 'assets/face.jpg',
+      musicFile: 'assets/music.mp3',
+      backgroundImages: [
+        'assets/bg1.jpg',
+        'assets/bg2.jpg',
+        'assets/bg3.jpg',
+        'assets/bg4.jpg'
+      ],
+      walkDurationMs: 14000,
+      backgroundChangeMs: 3200,
+      fpsLimit: 60
+    };
+
+    const app = document.getElementById('app');
+    const walker = document.getElementById('walker');
+    const character = document.getElementById('character');
+    const faceImg = document.getElementById('faceImg');
+    const armLeft = document.getElementById('armLeft');
+    const armRight = document.getElementById('armRight');
+    const legLeft = document.getElementById('legLeft');
+    const legRight = document.getElementById('legRight');
+    const bgA = document.getElementById('bgA');
+    const bgB = document.getElementById('bgB');
+    const music = document.getElementById('bgMusic');
+    const startBtn = document.getElementById('startBtn');
+    const startOverlay = document.getElementById('startOverlay');
+    const toggleMusicBtn = document.getElementById('toggleMusicBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const musicState = document.getElementById('musicState');
+
+    let animationId = null;
+    let backgroundTimer = null;
+    let sceneStarted = false;
+    let walkStartTs = 0;
+    let activeBgIndex = 0;
+    let activeLayer = bgA;
+    let inactiveLayer = bgB;
+    let currentFrameTime = 0;
+
+    function preloadImages(paths) {
+      return Promise.all(paths.map(src => new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve({ src, ok: true });
+        img.onerror = () => resolve({ src, ok: false });
+        img.src = src;
+      })));
+    }
+
+    function setMusicState(text) {
+      musicState.textContent = `Музыка: ${text}`;
+    }
+
+    function applyAssets() {
+      faceImg.src = config.faceImage;
+      music.src = config.musicFile;
+      bgA.style.backgroundImage = `url('${config.backgroundImages[0]}')`;
+      bgB.style.backgroundImage = `url('${config.backgroundImages[1] || config.backgroundImages[0]}')`;
+      bgA.classList.add('visible');
+      bgB.classList.remove('visible');
+    }
+
+    function swapBackground() {
+      if (config.backgroundImages.length === 0) return;
+      activeBgIndex = (activeBgIndex + 1) % config.backgroundImages.length;
+      inactiveLayer.style.backgroundImage = `url('${config.backgroundImages[activeBgIndex]}')`;
+      inactiveLayer.classList.add('visible');
+      activeLayer.classList.remove('visible');
+
+      const temp = activeLayer;
+      activeLayer = inactiveLayer;
+      inactiveLayer = temp;
+    }
+
+    function startBackgroundCycle() {
+      clearInterval(backgroundTimer);
+      backgroundTimer = setInterval(swapBackground, config.backgroundChangeMs);
+    }
+
+    function stopBackgroundCycle() {
+      clearInterval(backgroundTimer);
+      backgroundTimer = null;
+    }
+
+    function animateWalk(ts) {
+      if (!walkStartTs) walkStartTs = ts;
+
+      const minDelta = 1000 / config.fpsLimit;
+      if (ts - currentFrameTime < minDelta) {
+        animationId = requestAnimationFrame(animateWalk);
+        return;
+      }
+      currentFrameTime = ts;
+
+      const elapsed = (ts - walkStartTs) % config.walkDurationMs;
+      const progress = elapsed / config.walkDurationMs;
+      const x = 110 - progress * 140; // от правой части экрана к левой с запасом
+      walker.style.transform = `translateX(${x}vw)`;
+
+      const swing = Math.sin(progress * Math.PI * 2 * 4);
+      const counterSwing = Math.sin(progress * Math.PI * 2 * 4 + Math.PI);
+      const armAngle = swing * 28;
+      const legAngle = counterSwing * 24;
+      const bobY = Math.abs(Math.sin(progress * Math.PI * 2 * 4)) * -1.6;
+
+      character.style.transform = `translateY(${bobY}%)`;
+      armLeft.style.transform = `rotate(${armAngle}deg)`;
+      armRight.style.transform = `rotate(${-armAngle}deg)`;
+      legLeft.style.transform = `rotate(${legAngle}deg)`;
+      legRight.style.transform = `rotate(${-legAngle}deg)`;
+
+      animationId = requestAnimationFrame(animateWalk);
+    }
+
+    function stopWalk() {
+      if (animationId) cancelAnimationFrame(animationId);
+      animationId = null;
+      walkStartTs = 0;
+      currentFrameTime = 0;
+    }
+
+    function startWalk() {
+      stopWalk();
+      animationId = requestAnimationFrame(animateWalk);
+    }
+
+    async function startMusic() {
+      try {
+        await music.play();
+        setMusicState('играет');
+      } catch (e) {
+        setMusicState('не удалось запустить');
+        console.warn('Music autoplay/play error:', e);
+      }
+    }
+
+    function pauseMusic() {
+      music.pause();
+      setMusicState('пауза');
+    }
+
+    async function startScene() {
+      if (sceneStarted) return;
+      sceneStarted = true;
+      startOverlay.style.display = 'none';
+      startWalk();
+      startBackgroundCycle();
+      await startMusic();
+    }
+
+    async function restartScene() {
+      activeBgIndex = 0;
+      stopWalk();
+      stopBackgroundCycle();
+      activeLayer = bgA;
+      inactiveLayer = bgB;
+      bgA.style.backgroundImage = `url('${config.backgroundImages[0]}')`;
+      bgB.style.backgroundImage = `url('${config.backgroundImages[1] || config.backgroundImages[0]}')`;
+      bgA.classList.add('visible');
+      bgB.classList.remove('visible');
+      walker.style.transform = 'translateX(110vw)';
+      music.currentTime = 0;
+      startWalk();
+      startBackgroundCycle();
+      await startMusic();
+    }
+
+    toggleMusicBtn.addEventListener('click', async () => {
+      if (music.paused) {
+        await startMusic();
+      } else {
+        pauseMusic();
+      }
+    });
+
+    restartBtn.addEventListener('click', restartScene);
+    startBtn.addEventListener('click', startScene);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        music.pause();
+        setMusicState('пауза');
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      // Пустой обработчик оставлен для будущего расширения и стабилизации на мобильных браузерах.
+    }, { passive: true });
+
+    async function init() {
+      applyAssets();
+      const assetsToLoad = [config.faceImage, ...config.backgroundImages];
+      const result = await preloadImages(assetsToLoad);
+      const failed = result.filter(x => !x.ok).map(x => x.src);
+      if (failed.length) {
+        console.warn('Не удалось загрузить файлы:', failed);
+      }
+      setMusicState('ожидание');
+    }
+
+    init();
+  </script>
+</body>
+</html>
