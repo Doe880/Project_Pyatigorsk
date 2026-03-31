@@ -31,7 +31,7 @@
     #app {
       position: relative;
       width: 100vw;
-      height: 100vh;
+      height: 100dvh;
       overflow: hidden;
       background: #000;
     }
@@ -42,6 +42,7 @@
       background-position: center center;
       background-repeat: no-repeat;
       background-size: cover;
+      background-color: #000;
       opacity: 0;
       transition: opacity 1.2s ease-in-out, transform 6s linear;
       transform: scale(1.04);
@@ -176,31 +177,6 @@
       filter: blur(4px);
     }
 
-    .hud {
-      position: absolute;
-      left: 12px;
-      right: 12px;
-      top: calc(12px + var(--safe-top));
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      z-index: 20;
-      pointer-events: none;
-    }
-
-    .badge {
-      background: var(--ui-bg);
-      border: 1px solid var(--ui-border);
-      border-radius: 999px;
-      padding: 10px 14px;
-      font-size: 13px;
-      line-height: 1;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      pointer-events: auto;
-    }
-
     .controls {
       position: absolute;
       left: 12px;
@@ -276,25 +252,10 @@
       opacity: 0.92;
     }
 
-    .hint {
-      font-size: 12px;
-      opacity: 0.74;
-      margin-top: 10px;
-    }
-
-    @keyframes bob {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-1.8%); }
-    }
-
     @media (min-width: 768px) {
       #walker {
         width: min(20vw, 190px);
         bottom: 13vh;
-      }
-
-      .badge {
-        font-size: 14px;
       }
     }
   </style>
@@ -319,10 +280,6 @@
 
     <div class="ground"></div>
 
-
-      <div class="badge" id="musicState">Музыка: ожидание</div>
-    </div>
-
     <div class="controls">
       <div class="controls-inner">
         <button id="toggleMusicBtn" type="button">Пауза / Пуск</button>
@@ -338,7 +295,6 @@
           чтобы начать анимацию и воспроизведение mp3.
         </p>
         <button id="startBtn" type="button">Старт</button>
-
       </div>
     </div>
 
@@ -347,25 +303,23 @@
 
   <script>
     const config = {
-      // Можно менять имена файлов здесь.
       faceImage: 'assets/face.jpg',
       musicFile: 'assets/music.mp3',
       backgroundImages: [
-        'assets/bg1.jpg',
-        'assets/bg2.jpg',
-        'assets/bg3.jpg',
-        'assets/bg4.jpg'
-        'assets/bg5.jpg'
-        'assets/bg6.jpg'
-        'assets/bg7.jpg'
-        'assets/bg8.jpg'
+        { src: 'assets/bg1.jpg', position: 'center center', mobilePosition: '50% 35%', size: 'cover', mobileSize: 'cover' },
+        { src: 'assets/bg2.jpg', position: 'center center', mobilePosition: 'center top', size: 'cover', mobileSize: 'cover' },
+        { src: 'assets/bg3.jpg', position: 'center center', mobilePosition: '50% 30%', size: 'cover', mobileSize: 'cover' },
+        { src: 'assets/bg4.jpg', position: 'center center', mobilePosition: 'center center', size: 'cover', mobileSize: 'contain' },
+        { src: 'assets/bg5.jpg', position: 'center center', mobilePosition: '50% 40%', size: 'cover', mobileSize: 'cover' },
+        { src: 'assets/bg6.jpg', position: 'center center', mobilePosition: 'center top', size: 'cover', mobileSize: 'cover' },
+        { src: 'assets/bg7.jpg', position: 'center center', mobilePosition: '50% 30%', size: 'cover', mobileSize: 'cover' },
+        { src: 'assets/bg8.jpg', position: 'center center', mobilePosition: 'center center', size: 'cover', mobileSize: 'contain' }
       ],
       walkDurationMs: 14000,
       backgroundChangeMs: 3200,
       fpsLimit: 60
     };
 
-    const app = document.getElementById('app');
     const walker = document.getElementById('walker');
     const character = document.getElementById('character');
     const faceImg = document.getElementById('faceImg');
@@ -380,7 +334,6 @@
     const startOverlay = document.getElementById('startOverlay');
     const toggleMusicBtn = document.getElementById('toggleMusicBtn');
     const restartBtn = document.getElementById('restartBtn');
-    const musicState = document.getElementById('musicState');
 
     let animationId = null;
     let backgroundTimer = null;
@@ -391,6 +344,10 @@
     let inactiveLayer = bgB;
     let currentFrameTime = 0;
 
+    function isMobile() {
+      return window.innerWidth <= 767;
+    }
+
     function preloadImages(paths) {
       return Promise.all(paths.map(src => new Promise(resolve => {
         const img = new Image();
@@ -400,23 +357,37 @@
       })));
     }
 
-    function setMusicState(text) {
-      musicState.textContent = `Музыка: ${text}`;
+    function applyBackgroundToLayer(layer, bgItem) {
+      const bgSrc = typeof bgItem === 'string' ? bgItem : bgItem.src;
+      const desktopPosition = typeof bgItem === 'string' ? 'center center' : (bgItem.position || 'center center');
+      const mobilePosition = typeof bgItem === 'string' ? 'center center' : (bgItem.mobilePosition || desktopPosition);
+      const desktopSize = typeof bgItem === 'string' ? 'cover' : (bgItem.size || 'cover');
+      const mobileSize = typeof bgItem === 'string' ? desktopSize : (bgItem.mobileSize || desktopSize);
+
+      layer.style.backgroundImage = `url('${bgSrc}')`;
+      layer.style.backgroundPosition = isMobile() ? mobilePosition : desktopPosition;
+      layer.style.backgroundSize = isMobile() ? mobileSize : desktopSize;
     }
 
     function applyAssets() {
       faceImg.src = config.faceImage;
       music.src = config.musicFile;
-      bgA.style.backgroundImage = `url('${config.backgroundImages[0]}')`;
-      bgB.style.backgroundImage = `url('${config.backgroundImages[1] || config.backgroundImages[0]}')`;
+
+      applyBackgroundToLayer(bgA, config.backgroundImages[0]);
+
+      const secondBg = config.backgroundImages[1] || config.backgroundImages[0];
+      applyBackgroundToLayer(bgB, secondBg);
+
       bgA.classList.add('visible');
       bgB.classList.remove('visible');
     }
 
     function swapBackground() {
       if (config.backgroundImages.length === 0) return;
+
       activeBgIndex = (activeBgIndex + 1) % config.backgroundImages.length;
-      inactiveLayer.style.backgroundImage = `url('${config.backgroundImages[activeBgIndex]}')`;
+      applyBackgroundToLayer(inactiveLayer, config.backgroundImages[activeBgIndex]);
+
       inactiveLayer.classList.add('visible');
       activeLayer.classList.remove('visible');
 
@@ -447,7 +418,7 @@
 
       const elapsed = (ts - walkStartTs) % config.walkDurationMs;
       const progress = elapsed / config.walkDurationMs;
-      const x = 110 - progress * 140; // от правой части экрана к левой с запасом
+      const x = 110 - progress * 140;
       walker.style.transform = `translateX(${x}vw)`;
 
       const swing = Math.sin(progress * Math.PI * 2 * 4);
@@ -480,16 +451,13 @@
     async function startMusic() {
       try {
         await music.play();
-        setMusicState('играет');
       } catch (e) {
-        setMusicState('не удалось запустить');
         console.warn('Music autoplay/play error:', e);
       }
     }
 
     function pauseMusic() {
       music.pause();
-      setMusicState('пауза');
     }
 
     async function startScene() {
@@ -507,8 +475,10 @@
       stopBackgroundCycle();
       activeLayer = bgA;
       inactiveLayer = bgB;
-      bgA.style.backgroundImage = `url('${config.backgroundImages[0]}')`;
-      bgB.style.backgroundImage = `url('${config.backgroundImages[1] || config.backgroundImages[0]}')`;
+
+      applyBackgroundToLayer(bgA, config.backgroundImages[0]);
+      applyBackgroundToLayer(bgB, config.backgroundImages[1] || config.backgroundImages[0]);
+
       bgA.classList.add('visible');
       bgB.classList.remove('visible');
       walker.style.transform = 'translateX(110vw)';
@@ -516,6 +486,13 @@
       startWalk();
       startBackgroundCycle();
       await startMusic();
+    }
+
+    function refreshBackgroundsForViewport() {
+      applyBackgroundToLayer(activeLayer, config.backgroundImages[activeBgIndex]);
+
+      const nextIndex = (activeBgIndex + 1) % config.backgroundImages.length;
+      applyBackgroundToLayer(inactiveLayer, config.backgroundImages[nextIndex]);
     }
 
     toggleMusicBtn.addEventListener('click', async () => {
@@ -532,23 +509,22 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         music.pause();
-        setMusicState('пауза');
       }
     });
 
     window.addEventListener('resize', () => {
-      // Пустой обработчик оставлен для будущего расширения и стабилизации на мобильных браузерах.
+      refreshBackgroundsForViewport();
     }, { passive: true });
 
     async function init() {
       applyAssets();
-      const assetsToLoad = [config.faceImage, ...config.backgroundImages];
+      const assetsToLoad = [config.faceImage, ...config.backgroundImages.map(item => item.src)];
       const result = await preloadImages(assetsToLoad);
       const failed = result.filter(x => !x.ok).map(x => x.src);
+
       if (failed.length) {
         console.warn('Не удалось загрузить файлы:', failed);
       }
-      setMusicState('ожидание');
     }
 
     init();
